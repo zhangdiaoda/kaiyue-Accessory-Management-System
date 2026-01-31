@@ -1,0 +1,197 @@
+/* 全局响应式工具类 */
+
+/* ========== 移动端优化 (< 768px) ========== */
+@media (max-width: 768px) {
+
+    /* 隐藏非必要列 */
+    .hidden-xs-only {
+        display: none !important;
+    }
+
+    /* 全宽显示 */
+    .full-width-xs {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* 登录卡片优化 */
+    .login-card {
+        margin: 0 !important;
+        border-radius: 16px !important;
+    }
+
+    /* 弹窗全屏 */
+    .el-dialog {
+        width: 95% !important;
+        margin: 20px auto !important;
+    }
+
+    .el-dialog__body {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    /* 表格横向滚动 */
+    .el-table {
+        overflow-x: auto;
+    }
+
+    .el-table__body-wrapper {
+        overflow-x: auto;
+    }
+
+    /* 卡片内边距缩小 */
+    .el-card {
+        padding: 12px !important;
+    }
+
+    .el-card__body {
+        padding: 12px !important;
+    }
+
+    /* 统计卡片垂直排列 */
+    .stat-cards,
+    .dashboard-cards {
+        flex-direction: column !important;
+    }
+
+    .stat-card,
+    .dashboard-card {
+        width: 100% !important;
+        margin-bottom: 12px !important;
+    }
+
+    /* 表单优化 */
+    .el-form-item__label {
+        font-size: 13px !important;
+    }
+
+    /* 按钮组优化 */
+    .toolbar-buttons {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* 搜索框全宽 */
+    .search-input {
+        width: 100% !important;
+        margin-bottom: 12px;
+    }
+
+    /* 分页器调整 */
+    .el-pagination {
+        justify-content: center !important;
+    }
+
+    .el-pagination .btn-prev,
+    .el-pagination .btn-next {
+        padding: 0 8px !important;
+    }
+
+    /* Logo 适配 */
+    .logo-circle {
+        width: 56px !important;
+        height: 56px !important;
+    }
+
+    .login-title {
+        font-size: 22px !important;
+    }
+
+    .login-subtitle {
+        font-size: 13px !important;
+    }
+}
+
+/* ========== 平板优化 (768px - 1024px) ========== */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .el-dialog {
+        width: 70% !important;
+    }
+
+    .stat-cards {
+        flex-wrap: wrap;
+    }
+
+    .stat-card {
+        flex: 1 1 45%;
+        min-width: 280px;
+    }
+}
+
+/* ========== 大屏优化 (> 1920px) ========== */
+@media (min-width: 1920px) {
+
+    /* 弹窗不要太小 */
+    .el-dialog {
+        min-width: 800px !important;
+    }
+
+    .el-dialog.dialog-large {
+        width: 60% !important;
+        max-width: 1200px !important;
+    }
+
+    /* 内容区域最大宽度 */
+    .main-content {
+        max-width: 1800px;
+        margin: 0 auto;
+    }
+
+    /* 卡片内边距增加 */
+    .el-card__body {
+        padding: 24px !important;
+    }
+
+    /* 字体稍微放大 */
+    .stat-card .value {
+        font-size: 32px !important;
+    }
+}
+
+/* ========== 触摸设备优化 ========== */
+@media (hover: none) and (pointer: coarse) {
+
+    /* 增加点击区域 */
+    .el-button {
+        min-height: 44px !important;
+        padding: 12px 20px !important;
+    }
+
+    /* 表格行高增加 */
+    .el-table__row {
+        height: 52px;
+    }
+
+    /* 链接点击区域 */
+    .el-link {
+        padding: 8px !important;
+    }
+}
+
+/* ========== 横屏移动设备 ========== */
+@media (max-width: 926px) and (orientation: landscape) {
+    .login-card {
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .login-header {
+        margin-bottom: 20px !important;
+    }
+}
+
+/* ========== 小屏手机 (< 375px) ========== */
+@media (max-width: 375px) {
+    .login-card {
+        padding: 24px 20px !important;
+    }
+
+    .el-button {
+        font-size: 14px !important;
+    }
+
+    .el-table {
+        font-size: 12px !important;
+    }
+}

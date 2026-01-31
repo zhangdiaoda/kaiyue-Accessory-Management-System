@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # 1. 业务系统 - 后端 API
+  backend:
+    image: zhangyu991014/kaiyuewms-backend:latest
+    container_name: kaiyue-backend
+    restart: always
+    ports:
+      - "8091:8080" # 宿主机端口:容器端口（改为8091避免冲突）
+    environment:
+      # 数据库连接 (使用服务名 mysql)
+      MYSQL_DSN: "warehouse:Warehouse2026@tcp(mysql:3306)/warehouse?charset=utf8mb4&parseTime=True&loc=Local"
+      # Redis 连接 (使用服务名 redis)
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: ""
+      JWT_SECRET: "your-secret-key-change-me-in-production"
+      GIN_MODE: "release"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backups:/app/backups
+    networks:
+      - warehouse-net
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health", "||", "exit", "1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # 2. 业务系统 - 前端页面
+  frontend:
+    image: zhangyu991014/kaiyuewms-frontend:latest
+    container_name: kaiyue-frontend
+    restart: always
+    ports:
+      - "8090:80" # Web 访问端口
+      - "8443:443" # HTTPS 端口（可选）
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - warehouse-net
+
+  # 3. 基础服务 - MySQL 8.0
+  mysql:
+    image: mysql:8.0
+    container_name: warehouse-mysql
+    restart: always
+    ports:
+      - "3306:3306" # 暴露端口供本地开发使用
+    environment:
+      MYSQL_ROOT_PASSWORD: Warehouse2026
+      MYSQL_DATABASE: warehouse
+      MYSQL_USER: warehouse
+      MYSQL_PASSWORD: Warehouse2026
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d # 自动执行初始化SQL
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - warehouse-net
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uwarehouse", "-pWarehouse2026" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # 4. 基础服务 - Redis
+  redis:
+    image: redis:7-alpine
+    container_name: kaiyue-redis
+    restart: always
+    ports:
+      - "6379:6379" # 暴露端口供本地开发使用
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - warehouse-net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  warehouse-net:
+    driver: bridge

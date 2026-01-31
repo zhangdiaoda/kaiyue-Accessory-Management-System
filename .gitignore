@@ -1,0 +1,46 @@
+# 不需要上传到Git的文件
+.git/
+.DS_Store
+Thumbs.db
+
+# 本地开发文件
+*.log
+*.swp
+*.swo
+*~
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.production
+
+# 备份文件
+backups/
+*.sql.backup
+*.dump
+
+# IDE配置
+.vscode/
+.idea/
+*.iml
+
+# Node modules (如果有)
+node_modules/
+npm-debug.log*
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# Docker相关
+.dockerignore
+
+# 操作系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
