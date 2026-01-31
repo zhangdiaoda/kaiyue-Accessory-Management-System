@@ -113,6 +113,9 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.GET("/branding", systemHandler.GetBrandingConfig)
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{"status": "ok", "message": "backend api is ready"})
+		})
 
 		// 认证路由管理
 		auth := api.Group("/auth")
