@@ -86,6 +86,14 @@ func main() {
 	// 使用CORS中间件
 	router.Use(middleware.CORSMiddleware())
 
+	// 根路径健康检查 (兼容部分环境的心跳检测，减少 404 日志)
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "healthy",
+			"service": "Kaiyue WMS API",
+		})
+	})
+
 	// 创建Handler
 	authHandler := handler.NewAuthHandler(db)
 	partHandler := handler.NewPartHandler(db, notifIntegrator)

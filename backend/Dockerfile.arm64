@@ -1,0 +1,9 @@
+FROM alpine:latest
+WORKDIR /app
+RUN apk --no-cache add ca-certificates tzdata
+ENV TZ=Asia/Shanghai
+COPY warehouse-server-arm64 ./warehouse-server
+COPY config/ ./config/
+RUN chmod +x ./warehouse-server
+EXPOSE 8080
+CMD ["./warehouse-server"]
