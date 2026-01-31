@@ -25,12 +25,6 @@ services:
       - ./backups:/app/backups
     networks:
       - warehouse-net
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1" ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
   # 2. 业务系统 - 前端页面
   frontend:
@@ -41,8 +35,7 @@ services:
       - "8090:80" # Web 访问端口
       - "8443:443" # HTTPS 端口（可选）
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - warehouse-net
 
