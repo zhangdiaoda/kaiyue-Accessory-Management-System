@@ -1,9 +1,6 @@
 services:
   # 1. 业务系统 - 后端 API
   backend:
-    # 架构提示：
-    # - 如果是 Intel/AMD 处理器 (x86_64)，使用 :latest
-    # - 如果是 ARM 处理器 (飞牛 NAS 部分型号)，使用 :latest-arm64
     image: zhangyu991014/kaiyuewms-backend:latest
     container_name: kaiyue-backend
     restart: always
