@@ -135,7 +135,30 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('dingtalk.secret', '', '钉钉群机器人加签密钥'),
 ('report.auto_push', 'true', '是否自动推送报表'),
 ('report.push_day', '1', '每月推送日期（1-28）'),
-('stock.warning.enabled', 'true', '是否启用库存预警');
+('stock.warning.enabled', 'true', '是否启用库存预警'),
+('schedule_daily_report_cron', '0 30 8 * * *', '日度报表推送时间'),
+('schedule_overdue_check_cron', '0 0 9 * * *', '逾期检查执行时间'),
+('schedule_weekly_report_cron', '0 0 9 * * 1', '周报推送时间'),
+('schedule_monthly_report_cron', '0 0 9 1 * *', '月报推送时间');
+
+-- 插入默认通知场景配置
+CREATE TABLE IF NOT EXISTS `notification_config` (
+  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `provider_type` VARCHAR(50),
+  `scene_type` VARCHAR(100),
+  `is_enabled` BOOLEAN DEFAULT TRUE,
+  `config_json` TEXT,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO `notification_config` (`provider_type`, `scene_type`, `is_enabled`, `config_json`) VALUES
+('dingtalk', 'stock_warning', 1, '{}'),
+('dingtalk', 'borrow_created', 1, '{}'),
+('dingtalk', 'return_reminder', 1, '{}'),
+('wechat', 'stock_warning', 1, '{}'),
+('wechat', 'borrow_created', 1, '{}'),
+('internal', 'all', 1, '{}');
 
 -- 插入默认配件分类
 INSERT INTO `part_category` (`name`, `parent_id`, `sort_order`) VALUES
