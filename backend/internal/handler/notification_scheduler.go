@@ -5,6 +5,7 @@ import (
 	"log"
 	"sync"
 	"warehouse/internal/model"
+	"warehouse/internal/service"
 
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
@@ -52,6 +53,7 @@ func (s *NotificationScheduler) initDefaultScheduleConfig() {
 		"schedule_overdue_check_cron":  "0 0 9 * * *",  // 每天 9:00
 		"schedule_weekly_report_cron":  "0 0 9 * * 1",  // 每周一 9:00
 		"schedule_monthly_report_cron": "0 0 9 1 * *",  // 每月1号 9:00
+		"schedule_log_cleanup_cron":    "0 0 2 * * *",  // 每天凌晨2点清理日志
 	}
 
 	for key, value := range defaults {
@@ -109,6 +111,13 @@ func (s *NotificationScheduler) registerTasksFromConfig() {
 		s.registerTask("monthly_report", cronExpr, func() {
 			log.Println("⏰ 执行定时任务: 发送月报")
 			s.ni.SendMonthlyReport()
+		})
+	}
+
+	// 注册日志清理任务
+	if cronExpr := s.getCronConfig("schedule_log_cleanup_cron"); cronExpr != "" {
+		s.registerTask("log_cleanup", cronExpr, func() {
+			s.performLogCleanup()
 		})
 	}
 }
@@ -172,6 +181,10 @@ func (s *NotificationScheduler) UpdateSchedule(taskName, cronExpr string) error 
 			log.Println("⏰ 执行定时任务: 发送月报")
 			s.ni.SendMonthlyReport()
 		}
+	case "log_cleanup":
+		job = func() {
+			s.performLogCleanup()
+		}
 	default:
 		return fmt.Errorf("未知的任务名称: %s", taskName)
 	}
@@ -201,4 +214,45 @@ func (s *NotificationScheduler) RunDailyReportNow() {
 // RunOverdueCheckNow 立即手动执行超期检查
 func (s *NotificationScheduler) RunOverdueCheckNow() {
 	go s.ni.CheckAndNotifyOverdueReturn()
+}
+
+// performLogCleanup 执行日志清理任务
+func (s *NotificationScheduler) performLogCleanup() {
+	log.Println("⏰ 执行定时任务: 清理操作日志")
+
+	// 创建审计服务
+	auditService := service.NewAuditService(s.db)
+
+	// 获取清理配置
+	config, err := auditService.GetCleanupConfig()
+	if err != nil || !config.Enabled {
+		log.Println("⏸️  日志清理未启用或配置错误,跳过")
+		return
+	}
+
+	// 1. 按大小清理(如果超过阈值)
+	sizeMB, _ := auditService.GetTableSize()
+	log.Printf("📊 当前日志表大小: %.2f MB, 阈值: %d MB", sizeMB, config.SizeThreshold)
+
+	if sizeMB > float64(config.SizeThreshold) {
+		deletedCount, err := auditService.CleanupBySize(float64(config.SizeThreshold), config.KeepCount)
+		if err != nil {
+			log.Printf("❌ 按大小清理日志失败: %v", err)
+		} else {
+			log.Printf("✅ 按大小清理完成,删除了 %d 条旧日志", deletedCount)
+		}
+	}
+
+	// 2. 按天数清理
+	if config.DaysToKeep > 0 {
+		deletedCount, err := auditService.DeleteOldLogs(config.DaysToKeep)
+		if err != nil {
+			log.Printf("❌ 按天数清理日志失败: %v", err)
+		} else if deletedCount > 0 {
+			log.Printf("✅ 按天数清理完成,删除了 %d 条过期日志", deletedCount)
+		}
+	}
+
+	// 更新最后清理时间
+	auditService.UpdateLastCleanupTime()
 }

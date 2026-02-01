@@ -25,3 +25,36 @@ export const getOperationStats = (params) => {
         params
     })
 }
+
+// 清空操作日志
+export const clearLogs = () => {
+    return request({
+        url: '/operation-logs/clear',
+        method: 'post'
+    })
+}
+
+// 获取日志表大小
+export const getLogSize = () => {
+    return request({
+        url: '/operation-logs/size',
+        method: 'get'
+    })
+}
+
+// 获取清理配置
+export const getCleanupConfig = () => {
+    return request({
+        url: '/operation-logs/cleanup-config',
+        method: 'get'
+    })
+}
+
+// 更新清理配置
+export const updateCleanupConfig = (data) => {
+    return request({
+        url: '/operation-logs/cleanup-config',
+        method: 'post',
+        data
+    })
+}

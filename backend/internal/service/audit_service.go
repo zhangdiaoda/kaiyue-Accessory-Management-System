@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"time"
 	"warehouse/internal/model"
 
@@ -182,4 +183,161 @@ func (s *AuditService) GetOperationStats(startTime, endTime time.Time) (*Operati
 	}
 
 	return stats, nil
+}
+
+// ClearAllLogs 清空所有操作日志
+func (s *AuditService) ClearAllLogs() (int64, error) {
+	result := s.db.Unscoped().Where("1 = 1").Delete(&model.OperationLog{})
+	return result.RowsAffected, result.Error
+}
+
+// GetTableSize 获取日志表大小(MB)
+func (s *AuditService) GetTableSize() (float64, error) {
+	var result struct {
+		SizeMB float64 `gorm:"column:size_mb"`
+	}
+
+	err := s.db.Raw(`
+		SELECT 
+			ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
+		FROM information_schema.TABLES
+		WHERE table_schema = DATABASE()
+		  AND table_name = 'sys_operation_log'
+	`).Scan(&result).Error
+
+	if err != nil {
+		return 0, err
+	}
+	return result.SizeMB, nil
+}
+
+// CleanupBySize 按大小清理日志(保留最近的记录)
+func (s *AuditService) CleanupBySize(maxSizeMB float64, keepCount int) (int64, error) {
+	// 先检查当前大小
+	currentSize, err := s.GetTableSize()
+	if err != nil {
+		return 0, err
+	}
+
+	// 如果未超过阈值,不处理
+	if currentSize <= maxSizeMB {
+		return 0, nil
+	}
+
+	// 获取总记录数
+	var totalCount int64
+	if err := s.db.Model(&model.OperationLog{}).Count(&totalCount).Error; err != nil {
+		return 0, err
+	}
+
+	// 计算需要删除的记录数
+	deleteCount := totalCount - int64(keepCount)
+	if deleteCount <= 0 {
+		return 0, nil
+	}
+
+	// 获取需要保留的最小ID(最新的keepCount条记录)
+	var minIDToKeep uint
+	if err := s.db.Model(&model.OperationLog{}).
+		Select("id").
+		Order("created_at DESC").
+		Limit(keepCount).
+		Offset(keepCount-1).
+		Pluck("id", &minIDToKeep).Error; err != nil {
+		return 0, err
+	}
+
+	// 删除旧记录
+	result := s.db.Unscoped().Where("id < ?", minIDToKeep).Delete(&model.OperationLog{})
+	return result.RowsAffected, result.Error
+}
+
+// GetCleanupConfig 获取清理配置
+type CleanupConfig struct {
+	Enabled       bool   `json:"enabled"`
+	Schedule      string `json:"schedule"`       // daily, weekly, monthly
+	SizeThreshold int    `json:"size_threshold"` // MB
+	DaysToKeep    int    `json:"days_to_keep"`
+	KeepCount     int    `json:"keep_count"`      // 按大小清理时保留的记录数
+	LastCleanupAt string `json:"last_cleanup_at"` // 最后清理时间
+}
+
+func (s *AuditService) GetCleanupConfig() (*CleanupConfig, error) {
+	config := &CleanupConfig{
+		Enabled:       false,
+		Schedule:      "weekly",
+		SizeThreshold: 1024,
+		DaysToKeep:    30,
+		KeepCount:     10000,
+	}
+
+	// 从sys_config表读取配置
+	var configs []model.SysConfig
+	if err := s.db.Where("config_key LIKE 'log_cleanup_%'").Find(&configs).Error; err != nil {
+		return config, nil // 返回默认配置
+	}
+
+	for _, c := range configs {
+		switch c.ConfigKey {
+		case "log_cleanup_enabled":
+			config.Enabled = c.ConfigValue == "true"
+		case "log_cleanup_schedule":
+			config.Schedule = c.ConfigValue
+		case "log_cleanup_size_threshold":
+			fmt.Sscanf(c.ConfigValue, "%d", &config.SizeThreshold)
+		case "log_cleanup_days_to_keep":
+			fmt.Sscanf(c.ConfigValue, "%d", &config.DaysToKeep)
+		case "log_cleanup_keep_count":
+			fmt.Sscanf(c.ConfigValue, "%d", &config.KeepCount)
+		case "log_cleanup_last_at":
+			config.LastCleanupAt = c.ConfigValue
+		}
+	}
+
+	return config, nil
+}
+
+// SaveCleanupConfig 保存清理配置
+func (s *AuditService) SaveCleanupConfig(config *CleanupConfig) error {
+	configs := map[string]string{
+		"log_cleanup_enabled":        fmt.Sprintf("%t", config.Enabled),
+		"log_cleanup_schedule":       config.Schedule,
+		"log_cleanup_size_threshold": fmt.Sprintf("%d", config.SizeThreshold),
+		"log_cleanup_days_to_keep":   fmt.Sprintf("%d", config.DaysToKeep),
+		"log_cleanup_keep_count":     fmt.Sprintf("%d", config.KeepCount),
+	}
+
+	for key, value := range configs {
+		var existingConfig model.SysConfig
+		err := s.db.Where("config_key = ?", key).First(&existingConfig).Error
+
+		if err == gorm.ErrRecordNotFound {
+			// 创建新配置
+			s.db.Create(&model.SysConfig{
+				ConfigKey:   key,
+				ConfigValue: value,
+			})
+		} else if err == nil {
+			// 更新现有配置
+			s.db.Model(&existingConfig).Update("config_value", value)
+		}
+	}
+
+	return nil
+}
+
+// UpdateLastCleanupTime 更新最后清理时间
+func (s *AuditService) UpdateLastCleanupTime() error {
+	now := time.Now().Format(time.RFC3339)
+	var config model.SysConfig
+	err := s.db.Where("config_key = ?", "log_cleanup_last_at").First(&config).Error
+
+	if err == gorm.ErrRecordNotFound {
+		return s.db.Create(&model.SysConfig{
+			ConfigKey:   "log_cleanup_last_at",
+			ConfigValue: now,
+		}).Error
+	}
+
+	return s.db.Model(&config).Update("config_value", now).Error
 }

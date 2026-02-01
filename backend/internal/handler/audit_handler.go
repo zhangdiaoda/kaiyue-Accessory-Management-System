@@ -140,3 +140,92 @@ func (h *AuditHandler) GetOperationStats(c *gin.Context) {
 		"data": stats,
 	})
 }
+
+// ClearLogs 手动清空所有日志
+func (h *AuditHandler) ClearLogs(c *gin.Context) {
+	deletedCount, err := h.auditService.ClearAllLogs()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "清空日志失败",
+		})
+		return
+	}
+
+	// 更新最后清理时间
+	h.auditService.UpdateLastCleanupTime()
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "清空成功",
+		"data": gin.H{
+			"deleted_count": deletedCount,
+		},
+	})
+}
+
+// GetLogSize 获取日志表大小
+func (h *AuditHandler) GetLogSize(c *gin.Context) {
+	sizeMB, err := h.auditService.GetTableSize()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取日志大小失败",
+		})
+		return
+	}
+
+	// 获取日志总数
+	var totalCount int64
+	h.db.Model(&service.LogFilter{}).Count(&totalCount)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 200,
+		"data": gin.H{
+			"size_mb":     sizeMB,
+			"total_count": totalCount,
+		},
+	})
+}
+
+// GetCleanupConfig 获取清理配置
+func (h *AuditHandler) GetCleanupConfig(c *gin.Context) {
+	config, err := h.auditService.GetCleanupConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取配置失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 200,
+		"data": config,
+	})
+}
+
+// UpdateCleanupConfig 更新清理配置
+func (h *AuditHandler) UpdateCleanupConfig(c *gin.Context) {
+	var config service.CleanupConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "参数错误",
+		})
+		return
+	}
+
+	if err := h.auditService.SaveCleanupConfig(&config); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "保存配置失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "配置已保存",
+	})
+}

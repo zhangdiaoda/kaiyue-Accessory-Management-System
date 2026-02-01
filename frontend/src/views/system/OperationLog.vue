@@ -3,7 +3,16 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>📝 操作日志</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span>📝 操作日志</span>
+            <el-tag v-if="logSize !== null" type="info" size="small">
+              当前大小: {{ logSize.size_mb }} MB
+            </el-tag>
+          </div>
+          <div>
+            <el-button type="warning" size="small" @click="configVisible = true">⚙️ 清理配置</el-button>
+            <el-button type="danger" size="small" @click="handleClearLogs">🗑️ 清空日志</el-button>
+          </div>
         </div>
       </template>
 
@@ -114,19 +123,79 @@
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
+
+    <!-- 清理配置对话框 -->
+    <el-dialog v-model="configVisible" title="⚠️ 日志清理配置" width="600px">
+      <el-form :model="cleanupConfig" label-width="120px">
+        <el-form-item label="启用自动清理">
+          <el-switch v-model="cleanupConfig.enabled" />
+        </el-form-item>
+        <el-form-item label="清理周期">
+          <el-select v-model="cleanupConfig.schedule" :disabled="!cleanupConfig.enabled">
+            <el-option label="每天" value="daily" />
+            <el-option label="每周" value="weekly" />
+            <el-option label="每月" value="monthly" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="大小阈值(MB)">
+          <el-input-number 
+            v-model="cleanupConfig.size_threshold" 
+            :min="100" 
+            :max="10000" 
+            :step="100"
+            :disabled="!cleanupConfig.enabled"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 5px;">
+            超过此大小将自动清理旧日志
+          </div>
+        </el-form-item>
+        <el-form-item label="保留天数">
+          <el-input-number 
+            v-model="cleanupConfig.days_to_keep" 
+            :min="7" 
+            :max="365" 
+            :disabled="!cleanupConfig.enabled"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 5px;">
+            自动删除超过此天数的日志
+          </div>
+        </el-form-item>
+        <el-form-item label="最小保留条数">
+          <el-input-number 
+            v-model="cleanupConfig.keep_count" 
+            :min="1000" 
+            :max="100000" 
+            :step="1000"
+            :disabled="!cleanupConfig.enabled"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 5px;">
+            按大小清理时至少保留的记录数
+          </div>
+        </el-form-item>
+        <el-form-item label="最后清理时间" v-if="cleanupConfig.last_cleanup_at">
+          <el-text>{{ cleanupConfig.last_cleanup_at }}</el-text>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="configVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveConfig">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { getOperationLogs, getLogDetail } from '@/api/audit'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getOperationLogs, getLogDetail, clearLogs, getLogSize, getCleanupConfig, updateCleanupConfig } from '@/api/audit'
 
 const loading = ref(false)
 const tableData = ref([])
 const detailVisible = ref(false)
+const configVisible = ref(false)
 const currentLog = ref(null)
 const dateRange = ref([])
+const logSize = ref(null)
 
 const searchForm = reactive({
   username: '',
@@ -139,6 +208,15 @@ const pagination = reactive({
   pageNum: 1,
   pageSize: 20,
   total: 0
+})
+
+const cleanupConfig = reactive({
+  enabled: false,
+  schedule: 'weekly',
+  size_threshold: 1024,
+  days_to_keep: 30,
+  keep_count: 10000,
+  last_cleanup_at: ''
 })
 
 const loadData = async () => {
@@ -192,8 +270,73 @@ const handleViewDetail = async (row) => {
   }
 }
 
+// 加载日志大小
+const loadLogSize = async () => {
+  try {
+    const res = await getLogSize()
+    if (res.code === 200) {
+      logSize.value = res.data
+    }
+  } catch (error) {
+    console.error('获取日志大小失败', error)
+  }
+}
+
+// 加载清理配置
+const loadCleanupConfig = async () => {
+  try {
+    const res = await getCleanupConfig()
+    if (res.code === 200) {
+      Object.assign(cleanupConfig, res.data)
+    }
+  } catch (error) {
+    console.error('获取清理配置失败', error)
+  }
+}
+
+// 清空日志
+const handleClearLogs = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将清空所有操作日志，是否继续？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    const res = await clearLogs()
+    if (res.code === 200) {
+      ElMessage.success(`已清空 ${res.data.deleted_count} 条日志`)
+      loadData()
+      loadLogSize()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('清空失败')
+    }
+  }
+}
+
+// 保存清理配置
+const handleSaveConfig = async () => {
+  try {
+    const res = await updateCleanupConfig(cleanupConfig)
+    if (res.code === 200) {
+      ElMessage.success('配置已保存')
+      configVisible.value = false
+    }
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
+}
+
 onMounted(() => {
   loadData()
+  loadLogSize()
+  loadCleanupConfig()
 })
 </script>
 

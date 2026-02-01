@@ -297,12 +297,18 @@ func main() {
 				permissions.PUT("/roles/:role", permissionHandler.SetRolePermissions)
 			}
 
-			// 操作日志（仅超级管理员）
+			// 操作日志(仅超级管理员)
 			audit := authRequired.Group("/operation-logs")
 			{
 				audit.GET("", auditHandler.GetOperationLogs)
 				audit.GET("/:id", auditHandler.GetLogDetail)
 				audit.GET("/stats", auditHandler.GetOperationStats)
+
+				// 日志清理功能
+				audit.POST("/clear", auditHandler.ClearLogs)
+				audit.GET("/size", auditHandler.GetLogSize)
+				audit.GET("/cleanup-config", auditHandler.GetCleanupConfig)
+				audit.POST("/cleanup-config", auditHandler.UpdateCleanupConfig)
 			}
 		}
 	}

@@ -37,7 +37,9 @@ request.interceptors.response.use(
             if (res.code === 401) {
                 const userStore = useUserStore()
                 userStore.logout()
-                router.push('/login')
+                ElMessage.warning('登录已失效,请重新登录')
+                // 使用replace避免用户点击浏览器后退按钮回到错误页面
+                router.replace('/login')
             }
 
             return Promise.reject(new Error(res.message || '请求失败'))
@@ -51,10 +53,11 @@ request.interceptors.response.use(
         if (error.response) {
             switch (error.response.status) {
                 case 401:
-                    ElMessage.error('未授权，请重新登录')
                     const userStore = useUserStore()
                     userStore.logout()
-                    router.push('/login')
+                    ElMessage.warning('登录已失效,请重新登录')
+                    // 使用replace避免用户点击浏览器后退按钮回到错误页面
+                    router.replace('/login')
                     break
                 case 403:
                     ElMessage.error('拒绝访问')
